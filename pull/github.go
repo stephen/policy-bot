@@ -27,10 +27,6 @@ import (
 )
 
 const (
-	// MaxPullRequestFiles is the max number of files returned by GitHub
-	// https://developer.github.com/v3/pulls/#list-pull-requests-files
-	MaxPullRequestFiles = 300
-
 	// MaxPullRequestCommits is the max number of commits returned by GitHub
 	// https://developer.github.com/v3/pulls/#list-commits-on-a-pull-request
 	MaxPullRequestCommits = 250
@@ -107,22 +103,17 @@ func (ghc *GitHubContext) Author() (string, error) {
 }
 
 func (ghc *GitHubContext) ChangedFiles() ([]*File, error) {
+	if len(ghc.commits) >= MaxPullRequestCommits {
+		return nil, errors.Errorf("too many commits in pull request, maximum is %d", MaxPullRequestCommits)
+	}
+
 	if ghc.files == nil {
-		var opt github.ListOptions
-		var allFiles []*github.CommitFile
-		for {
-			files, res, err := ghc.client.PullRequests.ListFiles(ghc.ctx, ghc.owner, ghc.repo, ghc.number, &opt)
-			if err != nil {
-				return nil, errors.Wrap(err, "failed to list pull request files")
-			}
-			allFiles = append(allFiles, files...)
-			if res.NextPage == 0 {
-				break
-			}
-			opt.Page = res.NextPage
+		comparison, _, err := ghc.client.Repositories.CompareCommits(ghc.ctx, ghc.owner, ghc.repo, *ghc.pr.Base.Ref, *ghc.pr.Head.Ref)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to list pull request files")
 		}
 
-		for _, f := range allFiles {
+		for _, f := range comparison.Files {
 			var status FileStatus
 			switch f.GetStatus() {
 			case "added":
@@ -140,9 +131,6 @@ func (ghc *GitHubContext) ChangedFiles() ([]*File, error) {
 				Deletions: f.GetDeletions(),
 			})
 		}
-	}
-	if len(ghc.files) >= MaxPullRequestFiles {
-		return nil, errors.Errorf("too many files in pull request, maximum is %d", MaxPullRequestFiles)
 	}
 	return ghc.files, nil
 }

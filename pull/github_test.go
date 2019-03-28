@@ -53,7 +53,7 @@ func TestAuthor(t *testing.T) {
 func TestChangedFiles(t *testing.T) {
 	rp := &ResponsePlayer{}
 	filesRule := rp.AddRule(
-		ExactPathMatcher("/repos/testorg/testrepo/pulls/123/files"),
+		ExactPathMatcher("/repos/testorg/testrepo/compare/f5f0a420388cc8e9ddc8a34f44f5990cbef5d037...80df3e81b68877153d5dcce69090515eca984ce4"),
 		"testdata/responses/pull_files.yml",
 	)
 
@@ -63,7 +63,7 @@ func TestChangedFiles(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, files, 3, "incorrect number of files")
-	assert.Equal(t, 2, filesRule.Count, "no http request was made")
+	assert.Equal(t, 1, filesRule.Count, "no http request was made")
 
 	assert.Equal(t, "path/foo.txt", files[0].Filename)
 	assert.Equal(t, FileAdded, files[0].Status)
@@ -79,7 +79,7 @@ func TestChangedFiles(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, files, 3, "incorrect number of files")
-	assert.Equal(t, 2, filesRule.Count, "cached files were not used")
+	assert.Equal(t, 1, filesRule.Count, "cached files were not used")
 }
 
 func TestCommits(t *testing.T) {
@@ -338,13 +338,19 @@ func makeContext(rp *ResponsePlayer) Context {
 	}
 
 	pr.Number = github.Int(123)
-	pr.Base = &github.PullRequestBranch{
-		Repo: &github.Repository{
-			Owner: &github.User{
-				Login: github.String("testorg"),
-			},
-			Name: github.String("testrepo"),
+	repo := &github.Repository{
+		Owner: &github.User{
+			Login: github.String("testorg"),
 		},
+		Name: github.String("testrepo"),
+	}
+	pr.Base = &github.PullRequestBranch{
+		Repo: repo,
+		Ref:  github.String("f5f0a420388cc8e9ddc8a34f44f5990cbef5d037"),
+	}
+	pr.Head = &github.PullRequestBranch{
+		Repo: repo,
+		Ref:  github.String("80df3e81b68877153d5dcce69090515eca984ce4"),
 	}
 
 	return NewGitHubContext(ctx, mbrCtx, client, v4client, pr)
